@@ -1,0 +1,21 @@
+{
+	"name": "@mgl-utils/pkcs11",
+	"version": "0.0.1",
+	"description": "libpkcs11 wrapper for node.js",
+	"main": "index.js",
+	"scripts": {
+		"build": "tsc"
+	},
+	"keywords": [
+		"pkcs11"
+	],
+	"author": "Muraviev I.V. <ger0strat@yandex.ru>",
+	"license": "ISC",
+	"dependencies": {
+		"ffi-napi": "^4.0.3"
+	},
+	"devDependencies": {
+		"@types/ffi-napi": "^4.0.10"
+	}
+}
+
