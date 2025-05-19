@@ -1,10 +1,22 @@
 {
-	"name": "@mgl-utils/pkcs11",
+	"name": "@mgl-utils/pkcs11_dev",
 	"version": "0.0.1",
 	"description": "libpkcs11 wrapper for node.js",
-	"main": "index.js",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist"
+	],
+	"config": {
+		"lastVersion": "0.0.0"
+	},
 	"scripts": {
-		"build": "tsc"
+		"tsc": "tsc",
+		"eslint": "eslint",
+		"build": "npm run tsc",
+		"reset-latest": "npx cross-var \"npm dist-tag set $npm_package_name@$npm_package_config_lastVersion latest -f\"",
+		"unpublish": "npx cross-var \"npm unpublish $npm_package_name@$npm_package_version -f\" && npm run reset-latest",
+		"republish": "npm run build && npm run unpublish && npm publish -f"
 	},
 	"keywords": [
 		"pkcs11"
@@ -12,10 +24,24 @@
 	"author": "Muraviev I.V. <ger0strat@yandex.ru>",
 	"license": "ISC",
 	"dependencies": {
-		"ffi-napi": "^4.0.3"
+		"ffi-napi": "^4.0.3",
+		"ref-napi": "^3.0.3"
 	},
 	"devDependencies": {
-		"@types/ffi-napi": "^4.0.10"
+		"@types/ffi-napi": "^4.0.10",
+		"@types/ref-napi": "^3.0.12",
+		"@typescript-eslint/eslint-plugin": "^8.32.1",
+		"@typescript-eslint/parser": "^8.32.1",
+		"eslint": "^9.26.0",
+		"eslint-config-prettier": "^10.1.5",
+		"eslint-plugin-prettier": "^5.4.0",
+		"prettier": "^3.5.3"
+	},
+	"peerDependencies": {
+		"typescript": "^5.8.3"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/DrJHWatson/mgl-utils-pkcs11.git"
 	}
 }
-
