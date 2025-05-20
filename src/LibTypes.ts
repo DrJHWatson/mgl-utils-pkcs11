@@ -97,6 +97,11 @@ export function buildUIntArrayType(
 export interface ISlotInfo {
 	slotDescription: string;
 	manufacturerID: string;
+	/**
+	 * CKF_TOKEN_PRESENT     0x00000001UL  /* a token is there
+	 * CKF_REMOVABLE_DEVICE  0x00000002UL  /* removable devices
+	 * CKF_HW_SLOT           0x00000004UL  /* hardware slot
+	 */
 	flags: number;
 	hardwareVersion: IVersion;
 	firmwareVersion: IVersion;
@@ -125,3 +130,126 @@ export const slotInfoType: Type<ISlotInfo> = {
 	size: 104,
 	name: 'slot_info',
 };
+
+export interface ITokenInfo {
+	label: string;
+	manufacturerID: string;
+	model: string;
+	serialNumber: string;
+	flags: number;
+
+	ulMaxSessionCount: number;
+	ulSessionCount: number;
+	ulMaxRwSessionCount: number;
+	ulRwSessionCount: number;
+	ulMaxPinLen: number;
+	ulMinPinLen: number;
+	ulTotalPublicMemory: number;
+	ulFreePublicMemory: number;
+	ulTotalPrivateMemory: number;
+	ulFreePrivateMemory: number;
+	hardwareVersion: IVersion;
+	firmwareVersion: IVersion;
+	utcTime: string;
+}
+
+export const tokenInfoType: Type<ITokenInfo> = {
+	get(buffer, offset) {
+		console.log(buffer.subarray(offset + 144, offset + 160));
+		return {
+			label: buffer.subarray(offset, offset + 32).toString(),
+			manufacturerID: buffer
+				.subarray(offset + 32, offset + 64)
+				.toString(),
+			model: buffer.subarray(offset + 64, offset + 80).toString(),
+			serialNumber: buffer.subarray(offset + 80, offset + 96).toString(),
+			flags: buffer.readUInt32LE(offset + 96),
+
+			ulMaxSessionCount: buffer.readUInt32LE(offset + 100),
+			ulSessionCount: buffer.readUInt32LE(offset + 104),
+			ulMaxRwSessionCount: buffer.readUInt32LE(offset + 108),
+			ulRwSessionCount: buffer.readUInt32LE(offset + 112),
+			ulMaxPinLen: buffer.readUInt32LE(offset + 116),
+			ulMinPinLen: buffer.readUInt32LE(offset + 120),
+			ulTotalPublicMemory: buffer.readUInt32LE(offset + 124),
+			ulFreePublicMemory: buffer.readUInt32LE(offset + 128),
+			ulTotalPrivateMemory: buffer.readUInt32LE(offset + 132),
+			ulFreePrivateMemory: buffer.readUInt32LE(offset + 136),
+			hardwareVersion: versionType.get(buffer, offset + 140),
+			firmwareVersion: versionType.get(buffer, offset + 142),
+			utcTime: buffer.subarray(offset + 144, offset + 160).toString(),
+		};
+	},
+	set(buffer, offset, value) {
+		buffer.writeCString(value.label, offset, 'utf8');
+		buffer.writeCString(value.manufacturerID, offset + 32, 'utf8');
+		buffer.writeCString(value.model, offset + 64, 'utf8');
+		buffer.writeCString(value.serialNumber, offset + 80, 'ansi');
+		buffer.writeUInt32LE(value.flags, offset + 96);
+
+		buffer.writeUInt32LE(value.ulMaxSessionCount, offset + 100);
+		buffer.writeUInt32LE(value.ulSessionCount, offset + 104);
+		buffer.writeUInt32LE(value.ulMaxRwSessionCount, offset + 108);
+		buffer.writeUInt32LE(value.ulRwSessionCount, offset + 112);
+		buffer.writeUInt32LE(value.ulMaxPinLen, offset + 116);
+		buffer.writeUInt32LE(value.ulMinPinLen, offset + 120);
+		buffer.writeUInt32LE(value.ulTotalPublicMemory, offset + 124);
+		buffer.writeUInt32LE(value.ulFreePublicMemory, offset + 128);
+		buffer.writeUInt32LE(value.ulTotalPrivateMemory, offset + 132);
+		buffer.writeUInt32LE(value.ulFreePrivateMemory, offset + 136);
+		versionType.set(buffer, offset + 140, value.hardwareVersion);
+		versionType.set(buffer, offset + 142, value.firmwareVersion);
+		buffer.writeCString(value.utcTime, offset + 144, 'utf8');
+	},
+	indirection: 1,
+	size: 160,
+	name: 'token_info',
+};
+
+export enum ETokenInfoFlags {
+	CKF_RNG = 0x1,
+	CKF_WRITE_PROTECTED = 0x2,
+	CKF_LOGIN_REQUIRED = 0x4,
+	CKF_USER_PIN_INITIALIZED = 0x8,
+	CKF_RESTORE_KEY_NOT_NEEDED = 0x20,
+	CKF_CLOCK_ON_TOKEN = 0x40,
+	CKF_PROTECTED_AUTHENTICATION_PATH = 0x100,
+	CKF_DUAL_CRYPTO_OPERATIONS = 0x200,
+	CKF_TOKEN_INITIALIZED = 0x400,
+	CKF_SECONDARY_AUTHENTICATION = 0x800,
+	CKF_USER_PIN_COUNT_LOW = 0x10000,
+	CKF_USER_PIN_FINAL_TRY = 0x20000,
+	CKF_USER_PIN_LOCKED = 0x40000,
+	CKF_USER_PIN_TO_BE_CHANGED = 0x80000,
+	CKF_SO_PIN_COUNT_LOW = 0x100000,
+	CKF_SO_PIN_FINAL_TRY = 0x200000,
+	CKF_SO_PIN_LOCKED = 0x400000,
+	CKF_SO_PIN_TO_BE_CHANGED = 0x800000,
+	CKF_ERROR_STATE = 0x1000000,
+}
+
+export interface IMechanismInfo {
+	ulMinKeySize: number;
+	ulMaxKeySize: number;
+	flags: number;
+}
+
+export const mechanismInfoType: Type<IMechanismInfo> = {
+	get(buffer, offset) {
+		return {
+			ulMinKeySize: buffer.readUInt32LE(offset),
+			ulMaxKeySize: buffer.readUInt32LE(offset + 4),
+			flags: buffer.readUInt32LE(offset + 8),
+		};
+	},
+	set(buffer, offset, value) {
+		buffer.writeUInt32LE(value.ulMinKeySize, offset);
+		buffer.writeUInt32LE(value.ulMaxKeySize, offset + 4);
+		buffer.writeUInt32LE(value.flags, offset + 8);
+	},
+	indirection: 1,
+	size: 12,
+	name: 'mechanism_info',
+};
+
+export type TULong = number | string;
