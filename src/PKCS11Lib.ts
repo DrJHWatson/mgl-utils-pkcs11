@@ -1,20 +1,32 @@
 import { DynamicLibrary, ForeignFunction } from 'ffi-napi';
-import { EPKCSResults, EPKSCFunctions } from './LibEnums';
+import { EPKCSResults, EPKCSFunctions } from './LibEnums';
 import { alloc, NULL, refType } from 'ref-napi';
 import {
 	buildUIntArrayType,
 	ILibInfo,
+	IMechanismInfo,
 	ISlotInfo,
+	ITokenInfo,
 	libInfoType,
+	mechanismInfoType,
 	slotInfoType,
+	tokenInfoType,
+	TULong,
 } from './LibTypes';
 
-interface ILibInterface extends Record<EPKSCFunctions, (...p: any[]) => void> {
-	[EPKSCFunctions.C_Initialize]: () => void;
-	[EPKSCFunctions.C_Finalize]: () => void;
-	[EPKSCFunctions.C_GetInfo]: () => ILibInfo;
-	[EPKSCFunctions.C_GetSlotList]: () => Array<number>;
-	[EPKSCFunctions.C_GetSlotInfo]: (id: number) => ISlotInfo;
+interface ILibInterface extends Record<EPKCSFunctions, (...p: any[]) => void> {
+	[EPKCSFunctions.C_Initialize]: () => void;
+	[EPKCSFunctions.C_Finalize]: () => void;
+	[EPKCSFunctions.C_GetInfo]: () => ILibInfo;
+	[EPKCSFunctions.C_GetSlotList]: () => Array<number>;
+	[EPKCSFunctions.C_GetSlotInfo]: (id: number) => ISlotInfo;
+	[EPKCSFunctions.C_GetTokenInfo]: (slotId: number) => ITokenInfo;
+	[EPKCSFunctions.C_WaitForSlotEvent]: (dontBlock: boolean) => TULong;
+	[EPKCSFunctions.C_GetMechanismList]: () => Array<TULong>;
+	[EPKCSFunctions.C_GetMechanismInfo]: (
+		slotId: number,
+		mechanismType: TULong,
+	) => IMechanismInfo;
 }
 
 type TErrors = (keyof typeof EPKCSResults)[];
@@ -36,11 +48,13 @@ export class PKCS11Lib implements ILibInterface {
 		checkErrors.forEach((key) => {
 			if (res === EPKCSResults[key]) throw { errorCode: key };
 		});
+
+		return res;
 	}
 
 	C_Initialize() {
 		const func = new ForeignFunction(
-			this.lib.get(EPKSCFunctions.C_Initialize),
+			this.lib.get(EPKCSFunctions.C_Initialize),
 			'ulong',
 			['void *'],
 		);
@@ -58,7 +72,7 @@ export class PKCS11Lib implements ILibInterface {
 
 	C_Finalize() {
 		const func = new ForeignFunction(
-			this.lib.get(EPKSCFunctions.C_Finalize),
+			this.lib.get(EPKCSFunctions.C_Finalize),
 			'ulong',
 			['void *'],
 		);
@@ -75,7 +89,7 @@ export class PKCS11Lib implements ILibInterface {
 	C_GetInfo() {
 		const buffer = alloc(libInfoType);
 		const func = new ForeignFunction(
-			this.lib.get(EPKSCFunctions.C_GetInfo),
+			this.lib.get(EPKCSFunctions.C_GetInfo),
 			'ulong',
 			[refType(libInfoType)],
 		);
@@ -99,7 +113,7 @@ export class PKCS11Lib implements ILibInterface {
 	C_GetSlotList() {
 		const len = alloc('ulong', 0);
 		const func = new ForeignFunction(
-			this.lib.get(EPKSCFunctions.C_GetSlotList),
+			this.lib.get(EPKCSFunctions.C_GetSlotList),
 			'ulong',
 			[
 				'uchar',
@@ -136,7 +150,7 @@ export class PKCS11Lib implements ILibInterface {
 	C_GetSlotInfo(id: number) {
 		const buffer = alloc(slotInfoType);
 		const func = new ForeignFunction(
-			this.lib.get(EPKSCFunctions.C_GetSlotInfo),
+			this.lib.get(EPKCSFunctions.C_GetSlotInfo),
 			'ulong',
 			['ulong', refType(slotInfoType)],
 		);
@@ -154,10 +168,121 @@ export class PKCS11Lib implements ILibInterface {
 
 		return buffer.deref();
 	}
-	C_GetTokenInfo: (...p: any[]) => number;
-	C_WaitForSlotEvent: (...p: any[]) => number;
-	C_GetMechanismList: (...p: any[]) => number;
-	C_GetMechanismInfo: (...p: any[]) => number;
+
+	C_GetTokenInfo(slotId): ITokenInfo {
+		const buffer = alloc(tokenInfoType);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_GetTokenInfo),
+			'ulong',
+			['ulong', refType(tokenInfoType)],
+		);
+		const errors: TErrors = [
+			'CKR_ARGUMENTS_BAD',
+			'CKR_CRYPTOKI_NOT_INITIALIZED',
+			'CKR_DEVICE_ERROR',
+			'CKR_FUNCTION_FAILED',
+			'CKR_GENERAL_ERROR',
+			'CKR_HOST_MEMORY',
+			'CKR_SLOT_ID_INVALID',
+		];
+
+		this.callFunction(func, errors, slotId, buffer);
+
+		return buffer.deref();
+	}
+
+	C_WaitForSlotEvent(dontBlock: boolean) {
+		const slotId = alloc('ulong', 0);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_WaitForSlotEvent),
+			'ulong',
+			['ulong', refType('ulong'), refType('void')],
+		);
+		const errors: TErrors = [
+			'CKR_ARGUMENTS_BAD',
+			'CKR_CRYPTOKI_NOT_INITIALIZED',
+			'CKR_DEVICE_ERROR',
+			'CKR_FUNCTION_FAILED',
+			'CKR_GENERAL_ERROR',
+			'CKR_HOST_MEMORY',
+		];
+
+		if (
+			this.callFunction(func, errors, dontBlock ? 1 : 0, slotId, NULL) ===
+			EPKCSResults.CKR_NO_EVENT
+		)
+			return -1;
+
+		return slotId.deref();
+	}
+
+	C_GetMechanismList() {
+		const len = alloc('ulong', 0);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_GetMechanismList),
+			'ulong',
+			['uchar', 'ulong *', 'ulong *'],
+		);
+		const errors: TErrors = [
+			'CKR_ARGUMENTS_BAD',
+			'CKR_CRYPTOKI_NOT_INITIALIZED',
+			'CKR_FUNCTION_FAILED',
+			'CKR_GENERAL_ERROR',
+			'CKR_HOST_MEMORY',
+			'CKR_BUFFER_TOO_SMALL',
+			'CKR_DEVICE_ERROR',
+			'CKR_DEVICE_MEMORY',
+			'CKR_DEVICE_REMOVED',
+			'CKR_SLOT_ID_INVALID',
+			'CKR_TOKEN_NOT_PRESENT',
+			'CKR_TOKEN_NOT_RECOGNIZED',
+		];
+
+		this.callFunction(func, errors, 1, NULL, len);
+
+		const lenValue = len.deref();
+
+		if (typeof lenValue === 'string') {
+			throw new Error(
+				'Слишком много механизмов, столько не бывает: ' + lenValue,
+			);
+		}
+
+		const buffer = alloc(buildUIntArrayType(lenValue, 4));
+
+		this.callFunction(func, errors, 1, buffer, len.ref());
+
+		return buffer.deref();
+	}
+
+	C_GetMechanismInfo(slotId: number, mechanismType: number | string) {
+		const mechanismInfo = alloc(mechanismInfoType);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_GetMechanismInfo),
+			'ulong',
+			['ulong', 'ulong', refType(mechanismInfoType)],
+		);
+		const errors: TErrors = [
+			'CKR_ARGUMENTS_BAD',
+			'CKR_CRYPTOKI_NOT_INITIALIZED',
+			'CKR_FUNCTION_FAILED',
+			'CKR_GENERAL_ERROR',
+			'CKR_HOST_MEMORY',
+			'CKR_BUFFER_TOO_SMALL',
+			'CKR_DEVICE_ERROR',
+			'CKR_DEVICE_MEMORY',
+			'CKR_DEVICE_REMOVED',
+			'CKR_SLOT_ID_INVALID',
+			'CKR_TOKEN_NOT_PRESENT',
+			'CKR_TOKEN_NOT_RECOGNIZED',
+			'CKR_MECHANISM_INVALID',
+		];
+
+		this.callFunction(func, errors, slotId, mechanismType, mechanismInfo);
+
+		return mechanismInfo.deref();
+	}
+
 	C_InitToken: (...p: any[]) => number;
 	C_InitPIN: (...p: any[]) => number;
 	C_SetPIN: (...p: any[]) => number;
