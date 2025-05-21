@@ -9,6 +9,7 @@ import {
 	ITokenInfo,
 	libInfoType,
 	mechanismInfoType,
+	sessionInfoType,
 	slotInfoType,
 	tokenInfoType,
 	TULong,
@@ -283,15 +284,279 @@ export class PKCS11Lib implements ILibInterface {
 		return mechanismInfo.deref();
 	}
 
-	C_InitToken: (...p: any[]) => number;
-	C_InitPIN: (...p: any[]) => number;
-	C_SetPIN: (...p: any[]) => number;
-	C_OpenSession: (...p: any[]) => number;
-	C_CloseSession: (...p: any[]) => number;
-	C_CloseAllSessions: (...p: any[]) => number;
-	C_GetSessionInfo: (...p: any[]) => number;
-	C_GetOperationState: (...p: any[]) => number;
-	C_SetOperationState: (...p: any[]) => number;
+	C_InitToken(slotId: TULong, pin: string, label: string) {
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_InitToken),
+			'ulong',
+			['ulong', 'CString', 'ulong', 'CString'],
+		);
+		const errors: TErrors = [
+			'CKR_ARGUMENTS_BAD',
+			'CKR_CRYPTOKI_NOT_INITIALIZED',
+			'CKR_DEVICE_ERROR',
+			'CKR_DEVICE_MEMORY',
+			'CKR_DEVICE_REMOVED',
+			'CKR_FUNCTION_CANCELED',
+			'CKR_FUNCTION_FAILED',
+			'CKR_FUNCTION_REJECTED',
+			'CKR_GENERAL_ERROR',
+			'CKR_HOST_MEMORY',
+			'CKR_PIN_INCORRECT',
+			'CKR_PIN_LOCKED',
+			'CKR_SESSION_EXISTS',
+			'CKR_SLOT_ID_INVALID',
+			'CKR_TOKEN_NOT_PRESENT',
+			'CKR_TOKEN_NOT_RECOGNIZED',
+			'CKR_TOKEN_WRITE_PROTECTED',
+		];
+
+		this.callFunction(func, errors, slotId, pin, pin.length, label);
+	}
+
+	C_InitPIN(sessionId: TULong, pin: string) {
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_InitPIN),
+			'ulong',
+			['ulong', 'CString', 'ulong'],
+		);
+		const errors: TErrors = [
+			'CKR_ARGUMENTS_BAD',
+			'CKR_CRYPTOKI_NOT_INITIALIZED',
+			'CKR_DEVICE_ERROR',
+			'CKR_DEVICE_MEMORY',
+			'CKR_DEVICE_REMOVED',
+			'CKR_FUNCTION_CANCELED',
+			'CKR_FUNCTION_FAILED',
+			'CKR_GENERAL_ERROR',
+			'CKR_HOST_MEMORY',
+			'CKR_PIN_INVALID',
+			'CKR_PIN_LEN_RANGE',
+			'CKR_SESSION_CLOSED',
+			'CKR_SESSION_READ_ONLY',
+			'CKR_SESSION_HANDLE_INVALID',
+			'CKR_USER_NOT_LOGGED_IN',
+		];
+
+		this.callFunction(func, errors, sessionId, pin, pin.length);
+	}
+
+	C_SetPIN(sessionId: TULong, oldPin: string, newPin: string) {
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_SetPIN),
+			'ulong',
+			['ulong', 'CString', 'ulong', 'CString', 'ulong'],
+		);
+		const errors: TErrors = [
+			'CKR_ARGUMENTS_BAD',
+			'CKR_CRYPTOKI_NOT_INITIALIZED',
+			'CKR_DEVICE_ERROR',
+			'CKR_DEVICE_MEMORY',
+			'CKR_DEVICE_REMOVED',
+			'CKR_FUNCTION_CANCELED',
+			'CKR_FUNCTION_FAILED',
+			'CKR_GENERAL_ERROR',
+			'CKR_HOST_MEMORY',
+			'CKR_PIN_INVALID',
+			'CKR_PIN_LEN_RANGE',
+			'CKR_SESSION_CLOSED',
+			'CKR_SESSION_READ_ONLY',
+			'CKR_SESSION_HANDLE_INVALID',
+			'CKR_PIN_INCORRECT',
+			'CKR_PIN_LOCKED',
+			'CKR_TOKEN_WRITE_PROTECTED',
+		];
+
+		this.callFunction(
+			func,
+			errors,
+			sessionId,
+			oldPin,
+			oldPin.length,
+			newPin,
+			newPin.length,
+		);
+	}
+
+	C_OpenSession(slotId: TULong, flags: TULong): TULong {
+		const sessionId = alloc('ulong');
+
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_OpenSession),
+			'ulong',
+			[
+				'ulong',
+				'ulong',
+				refType('void'),
+				refType('void'),
+				refType('ulong'),
+			],
+		);
+		const errors: TErrors = [
+			'CKR_ARGUMENTS_BAD',
+			'CKR_CRYPTOKI_NOT_INITIALIZED',
+			'CKR_DEVICE_ERROR',
+			'CKR_DEVICE_MEMORY',
+			'CKR_DEVICE_REMOVED',
+			'CKR_FUNCTION_FAILED',
+			'CKR_GENERAL_ERROR',
+			'CKR_HOST_MEMORY',
+			'CKR_TOKEN_WRITE_PROTECTED',
+			'CKR_SESSION_COUNT',
+			'CKR_SESSION_PARALLEL_NOT_SUPPORTED',
+			'CKR_SESSION_READ_WRITE_SO_EXISTS',
+			'CKR_SLOT_ID_INVALID',
+			'CKR_TOKEN_NOT_PRESENT',
+			'CKR_TOKEN_NOT_RECOGNIZED',
+		];
+
+		this.callFunction(func, errors, slotId, flags, NULL, NULL, sessionId);
+
+		return sessionId.deref();
+	}
+
+	C_CloseSession(sessionId: TULong) {
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_CloseSession),
+			'ulong',
+			['ulong'],
+		);
+		const errors: TErrors = [
+			'CKR_ARGUMENTS_BAD',
+			'CKR_CRYPTOKI_NOT_INITIALIZED',
+			'CKR_DEVICE_ERROR',
+			'CKR_DEVICE_MEMORY',
+			'CKR_DEVICE_REMOVED',
+			'CKR_FUNCTION_FAILED',
+			'CKR_GENERAL_ERROR',
+			'CKR_HOST_MEMORY',
+			'CKR_SESSION_CLOSED',
+			'CKR_SESSION_HANDLE_INVALID',
+		];
+
+		this.callFunction(func, errors, sessionId);
+	}
+
+	C_CloseAllSessions(slotId: TULong) {
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_CloseAllSessions),
+			'ulong',
+			['ulong'],
+		);
+		const errors: TErrors = [
+			'CKR_CRYPTOKI_NOT_INITIALIZED',
+			'CKR_DEVICE_ERROR',
+			'CKR_DEVICE_MEMORY',
+			'CKR_DEVICE_REMOVED',
+			'CKR_FUNCTION_FAILED',
+			'CKR_GENERAL_ERROR',
+			'CKR_HOST_MEMORY',
+			'CKR_SLOT_ID_INVALID',
+			'CKR_TOKEN_NOT_PRESENT',
+		];
+
+		this.callFunction(func, errors, slotId);
+	}
+
+	C_GetSessionInfo(sessionId: TULong) {
+		const info = alloc(sessionInfoType);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_GetSessionInfo),
+			'ulong',
+			['ulong', refType(sessionInfoType)],
+		);
+		const errors: TErrors = [
+			'CKR_CRYPTOKI_NOT_INITIALIZED',
+			'CKR_DEVICE_ERROR',
+			'CKR_DEVICE_MEMORY',
+			'CKR_DEVICE_REMOVED',
+			'CKR_FUNCTION_FAILED',
+			'CKR_GENERAL_ERROR',
+			'CKR_HOST_MEMORY',
+			'CKR_SLOT_ID_INVALID',
+			'CKR_TOKEN_NOT_PRESENT',
+			'CKR_ARGUMENTS_BAD',
+			'CKR_SESSION_CLOSED',
+			'CKR_SESSION_HANDLE_INVALID',
+		];
+
+		this.callFunction(func, errors, sessionId, info);
+
+		return info.deref();
+	}
+
+	/**
+	 * Доделать запуск операций и протестировать
+	 */
+	C_GetOperationState(sessionId: TULong) {
+		const buffer = alloc('char');
+		const len = alloc('ulong', 0);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_GetOperationState),
+			'ulong',
+			['ulong', refType('char'), refType('ulong *')],
+		);
+		const errors: TErrors = [
+			'CKR_CRYPTOKI_NOT_INITIALIZED',
+			'CKR_DEVICE_ERROR',
+			'CKR_DEVICE_MEMORY',
+			'CKR_DEVICE_REMOVED',
+			'CKR_FUNCTION_FAILED',
+			'CKR_GENERAL_ERROR',
+			'CKR_HOST_MEMORY',
+			'CKR_SLOT_ID_INVALID',
+			'CKR_TOKEN_NOT_PRESENT',
+			'CKR_ARGUMENTS_BAD',
+			'CKR_SESSION_CLOSED',
+			'CKR_SESSION_HANDLE_INVALID',
+		];
+
+		this.callFunction(func, errors, sessionId, buffer, len.ref());
+		console.log(buffer.deref(), len);
+
+		return buffer;
+	}
+
+	/**
+	 * Доделать запуск операций и протестировать
+	 */
+	C_SetOperationState(
+		sessionId: TULong,
+		buffer: Buffer,
+		encryptionKeyId: TULong,
+		authKeyId: TULong,
+	) {
+		const buf = alloc('byte *', buffer);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_GetOperationState),
+			'ulong',
+			['ulong', refType('byte'), 'ulong', 'ulong', 'ulong'],
+		);
+		const errors: TErrors = [
+			'CKR_CRYPTOKI_NOT_INITIALIZED',
+			'CKR_DEVICE_ERROR',
+			'CKR_DEVICE_MEMORY',
+			'CKR_DEVICE_REMOVED',
+			'CKR_FUNCTION_FAILED',
+			'CKR_GENERAL_ERROR',
+			'CKR_HOST_MEMORY',
+			'CKR_SLOT_ID_INVALID',
+			'CKR_TOKEN_NOT_PRESENT',
+			'CKR_ARGUMENTS_BAD',
+			'CKR_SESSION_CLOSED',
+			'CKR_SESSION_HANDLE_INVALID',
+		];
+
+		this.callFunction(
+			func,
+			errors,
+			sessionId,
+			buf.deref(),
+			buf.length,
+			encryptionKeyId,
+			authKeyId,
+		);
+	}
+
 	C_Login: (...p: any[]) => number;
 	C_Logout: (...p: any[]) => number;
 	C_CreateObject: (...p: any[]) => number;
