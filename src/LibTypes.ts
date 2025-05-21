@@ -253,3 +253,35 @@ export const mechanismInfoType: Type<IMechanismInfo> = {
 };
 
 export type TULong = number | string;
+
+export enum ESessionInfoFlag {
+	CKF_RW_SESSION = 0x2,
+	CKF_SERIAL_SESSION = 0x4,
+}
+
+export interface ISessionInfo {
+	slotID: number;
+	state: number;
+	flags: number;
+	ulDeviceError: number;
+}
+
+export const sessionInfoType: Type<ISessionInfo> = {
+	get(buffer, offset) {
+		return {
+			slotID: buffer.readUInt32LE(offset),
+			state: buffer.readUInt32LE(offset + 4),
+			flags: buffer.readUInt32LE(offset + 8),
+			ulDeviceError: buffer.readUInt32LE(offset + 12),
+		};
+	},
+	set(buffer, offset, value) {
+		buffer.writeUInt32LE(value.slotID, offset);
+		buffer.writeUInt32LE(value.state, offset + 4);
+		buffer.writeUInt32LE(value.flags, offset + 8);
+		buffer.writeUInt32LE(value.ulDeviceError, offset + 12);
+	},
+	indirection: 1,
+	size: 16,
+	name: 'session_info',
+};
