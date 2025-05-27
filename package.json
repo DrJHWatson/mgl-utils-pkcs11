@@ -25,10 +25,13 @@
 	"license": "ISC",
 	"dependencies": {
 		"ffi-napi": "^4.0.3",
-		"ref-napi": "^3.0.3"
+		"ref-array-di": "^1.2.2",
+		"ref-napi": "^3.0.3",
+		"ref-struct-di": "^1.1.1"
 	},
 	"devDependencies": {
 		"@types/ffi-napi": "^4.0.10",
+		"@types/ref-array-di": "^1.2.8",
 		"@types/ref-napi": "^3.0.12",
 		"@typescript-eslint/eslint-plugin": "^8.32.1",
 		"@typescript-eslint/parser": "^8.32.1",

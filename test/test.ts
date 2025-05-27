@@ -1,29 +1,14 @@
-import { ESessionInfoFlag } from '../src/LibTypes';
-import { PKCS11Lib } from '../src/PKCS11Lib';
+import { ESlotsGetting } from 'src/HighLevel/Enums';
+import { PKCS11 } from '../src';
 
-const a = new PKCS11Lib('./test/bin/rtpkcs11ecp.dll');
+const pkcs11 = new PKCS11('./test/bin/rtpkcs11ecp.dll');
 
-a.C_Initialize();
-// console.log(a.C_GetInfo());
+pkcs11.startListenSlots();
+setTimeout(() => {
+	const slots = pkcs11.getSlotsInfo(ESlotsGetting.CachedOnly);
+	pkcs11.stopListenSlots();
 
-// console.log(
-// 	a.C_GetSlotList().map((id) => {
-// 		return {
-// 			slot: a.C_GetSlotInfo(id),
-// 			token: a.C_GetTokenInfo(id),
-// 		};
-// 	}),
-// );
-// console.log(a.C_GetTokenInfo(2));
-// const newPromise = () =>
-// 	new Promise((resolve) => {
-// 		console.log(a.C_WaitForSlotEvent(true));
-// 		setTimeout(() => resolve(newPromise()), 1000);
-// 	});
-
-// newPromise();
-
-// a.C_InitToken(0, '12345678', 'test');
-
-const session = a.C_OpenSession(0, ESessionInfoFlag.CKF_SERIAL_SESSION);
-console.log(a.C_GetOperationState(session));
+	const slot = pkcs11.slotFactory(slots.keys().next().value);
+	const session = slot.openSession({ rw: true, serial: true });
+	console.log(session);
+}, 1000);
