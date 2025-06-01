@@ -1,7 +1,11 @@
-import { ISlotInfo, TULong } from '../LowLevel/LibTypes';
+import { ISlotInfo, ITokenInfo, TULong } from '../LowLevel/LibTypes';
 import { PKCS11Lib } from '../LowLevel/PKCS11Lib';
 import { ESlotsGetting } from './Enums';
 import { PKCS11Slot } from './PKCS11Slot';
+
+type StringKeys<T> = {
+	[P in keyof T]: T[P] extends string ? P : never;
+}[keyof T];
 
 export class PKCS11 {
 	private lib: PKCS11Lib;
@@ -51,5 +55,33 @@ export class PKCS11 {
 
 	slotFactory(slotId: TULong) {
 		return new PKCS11Slot(this.lib, slotId);
+	}
+
+	findToken(searchParams: Partial<Record<StringKeys<ITokenInfo>, RegExp>>) {
+		const slots = this.lib
+			.C_GetSlotList()
+			.map((slotId) => {
+				const slot = this.lib.C_GetSlotInfo(slotId);
+				return { ...slot, slotId };
+			})
+			.filter((slot) => slot.isPresent);
+		const tokens = slots.map((slot) => {
+			const token = this.lib.C_GetTokenInfo(slot.slotId);
+
+			if (
+				Object.keys(searchParams).find((searchKey) =>
+					token[searchKey]?.match(searchParams[searchKey]),
+				)
+			)
+				return {
+					...token,
+					slotId: slot.slotId,
+				};
+
+			return null;
+		});
+		const filtered = tokens.filter((value) => value);
+
+		return filtered;
 	}
 }

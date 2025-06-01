@@ -2,16 +2,22 @@ import { readPointer, Type } from 'ref-napi';
 import {
 	IAttribute,
 	ILibInfo,
+	IMechanism,
 	IMechanismInfo,
 	ISessionInfo,
 	ISlotInfo,
 	ITokenInfo,
 	IVersion,
 } from './LibTypes';
+import { ESlotFlags } from './LibEnums';
+
+function trimZeros(value: string) {
+	return value.trim().replace(/\0+$/, '');
+}
 
 export const attributeType: Type<IAttribute> = {
 	get(buffer, offset) {
-		const length = buffer.readUInt32LE(offset + 8);
+		const length = buffer.readUInt32LE(offset + 12);
 		return {
 			type: buffer.readUInt32LE(offset),
 			value: readPointer(buffer, offset + 4, length),
@@ -19,11 +25,11 @@ export const attributeType: Type<IAttribute> = {
 	},
 	set(buffer, offset, value) {
 		buffer.writeUInt32LE(value.type, offset);
-		buffer.writeUInt32LE(value.value.address(), offset + 4);
-		buffer.writeUInt32LE(value.value.length, offset + 8);
+		buffer.writeUInt64LE(value.value.address(), offset + 4);
+		buffer.writeUInt32LE(value.value.length, offset + 12);
 	},
 	indirection: 1,
-	size: 12,
+	size: 16,
 	name: 'attribute',
 };
 
@@ -67,14 +73,17 @@ export const mechanismInfoType: Type<IMechanismInfo> = {
 
 export const tokenInfoType: Type<ITokenInfo> = {
 	get(buffer, offset) {
-		console.log(buffer.subarray(offset + 144, offset + 160));
 		return {
-			label: buffer.subarray(offset, offset + 32).toString(),
-			manufacturerID: buffer
-				.subarray(offset + 32, offset + 64)
-				.toString(),
-			model: buffer.subarray(offset + 64, offset + 80).toString(),
-			serialNumber: buffer.subarray(offset + 80, offset + 96).toString(),
+			label: trimZeros(buffer.subarray(offset, offset + 32).toString()),
+			manufacturerID: trimZeros(
+				buffer.subarray(offset + 32, offset + 64).toString(),
+			),
+			model: trimZeros(
+				buffer.subarray(offset + 64, offset + 80).toString(),
+			),
+			serialNumber: trimZeros(
+				buffer.subarray(offset + 80, offset + 96).toString(),
+			),
 			flags: buffer.readUInt32LE(offset + 96),
 
 			ulMaxSessionCount: buffer.readUInt32LE(offset + 100),
@@ -96,7 +105,7 @@ export const tokenInfoType: Type<ITokenInfo> = {
 		buffer.writeCString(value.label, offset, 'utf8');
 		buffer.writeCString(value.manufacturerID, offset + 32, 'utf8');
 		buffer.writeCString(value.model, offset + 64, 'utf8');
-		buffer.writeCString(value.serialNumber, offset + 80, 'ansi');
+		buffer.writeCString(value.serialNumber, offset + 80, 'ascii');
 		buffer.writeUInt32LE(value.flags, offset + 96);
 
 		buffer.writeUInt32LE(value.ulMaxSessionCount, offset + 100);
@@ -120,15 +129,22 @@ export const tokenInfoType: Type<ITokenInfo> = {
 
 export const slotInfoType: Type<ISlotInfo> = {
 	get(buffer, offset) {
-		return {
-			slotDescription: buffer.subarray(offset, offset + 64).toString(),
-			manufacturerID: buffer
-				.subarray(offset + 64, offset + 96)
-				.toString(),
-			flags: buffer.readUInt32LE(offset + 96),
+		const flags = buffer.readUInt32LE(offset + 96);
+
+		return Object.freeze({
+			slotDescription: trimZeros(
+				buffer.subarray(offset, offset + 64).toString(),
+			),
+			manufacturerID: trimZeros(
+				buffer.subarray(offset + 64, offset + 96).toString(),
+			),
+			flags,
+			isPresent: !!(ESlotFlags.CKF_TOKEN_PRESENT | flags),
+			isRemovable: !!(ESlotFlags.CKF_REMOVABLE_DEVICE | flags),
+			isHardware: !!(ESlotFlags.CKF_HW_SLOT | flags),
 			hardwareVersion: versionType.get(buffer, offset + 100),
 			firmwareVersion: versionType.get(buffer, offset + 102),
-		};
+		});
 	},
 	set(buffer, offset, value) {
 		buffer.writeCString(value.slotDescription, offset, 'utf8');
@@ -149,11 +165,13 @@ export const libInfoType: Type<ILibInfo> = {
 	get(buffer, offset) {
 		return {
 			cryptokiVersion: versionType.get(buffer, offset),
-			manufacturerID: buffer.subarray(offset + 2, offset + 34).toString(),
+			manufacturerID: trimZeros(
+				buffer.subarray(offset + 2, offset + 34).toString(),
+			),
 			flags: buffer.readUint32LE(offset + 34),
-			libraryDescription: buffer
-				.subarray(offset + 38, offset + 70)
-				.toString(),
+			libraryDescription: trimZeros(
+				buffer.subarray(offset + 38, offset + 70).toString(),
+			),
 			libraryVersion: versionType.get(buffer, offset + 70),
 		};
 	},
@@ -180,4 +198,25 @@ export const versionType: Type<IVersion> = {
 	indirection: 1,
 	size: 2,
 	name: 'version',
+};
+
+export const mechanismType: Type<IMechanism> = {
+	get(buffer, offset) {
+		return {
+			type: buffer.readInt32LE(offset),
+			data: readPointer(
+				buffer,
+				offset + 4,
+				buffer.readInt32LE(offset + 12),
+			),
+		};
+	},
+	set(buffer, offset, value) {
+		buffer.writeUInt32LE(value.type, offset);
+		buffer.writeUInt64LE(value.data.address(), offset + 4);
+		buffer.writeUInt32LE(value.data.length, offset + 12);
+	},
+	indirection: 1,
+	size: 16,
+	name: 'mechanism',
 };
