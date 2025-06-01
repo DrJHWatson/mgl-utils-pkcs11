@@ -21,7 +21,7 @@ export default defineConfig([globalIgnores(["**/.eslintrc.js"]), {
     plugins: {
         "@typescript-eslint": typescriptEslintEslintPlugin,
     },
-    ignores: ["eslint.config.mjs"],
+    ignores: ["eslint.config.mjs", "babel.config.js", "jest.config.ts"],
     languageOptions: {
         globals: {
             ...globals.node,

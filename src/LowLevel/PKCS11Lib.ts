@@ -1,8 +1,14 @@
-import { EPKCSResults, EPKCSFunctions, EUserType } from './LibEnums';
+import {
+	EPKCSResults,
+	EPKCSFunctions,
+	EUserType,
+	EPKCSMechanism,
+} from './LibEnums';
 import refModule, { alloc, NULL, readPointer, refType } from 'ref-napi';
 import {
 	IAttribute,
 	ILibInfo,
+	IMechanism,
 	IMechanismInfo,
 	ISlotInfo,
 	ITokenInfo,
@@ -13,11 +19,12 @@ import {
 	attributeType,
 	libInfoType,
 	mechanismInfoType,
+	mechanismType,
 	sessionInfoType,
 	slotInfoType,
 	tokenInfoType,
 } from './FFITypes';
-import { buildUIntArrayType } from './Utils';
+import { buildUIntArrayType, ulongToNumber } from './Utils';
 import array from 'ref-array-di';
 
 const ArrayType = array(refModule);
@@ -30,7 +37,9 @@ interface ILibInterface extends Record<EPKCSFunctions, (...p: any[]) => void> {
 	[EPKCSFunctions.C_GetSlotInfo]: (id: TULong) => ISlotInfo;
 	[EPKCSFunctions.C_GetTokenInfo]: (slotId: TULong) => ITokenInfo;
 	[EPKCSFunctions.C_WaitForSlotEvent]: (dontBlock: boolean) => TULong;
-	[EPKCSFunctions.C_GetMechanismList]: () => Array<TULong>;
+	[EPKCSFunctions.C_GetMechanismList]: (
+		slotId: TULong,
+	) => Array<EPKCSMechanism>;
 	[EPKCSFunctions.C_GetMechanismInfo]: (
 		slotId: TULong,
 		mechanismType: TULong,
@@ -112,13 +121,7 @@ export class PKCS11Lib implements ILibInterface {
 
 		const lenValue = len.deref();
 
-		if (typeof lenValue === 'string') {
-			throw new Error(
-				'Слишком много токенов, столько не бывает: ' + lenValue,
-			);
-		}
-
-		const buffer = alloc(buildUIntArrayType(lenValue, 4));
+		const buffer = alloc(buildUIntArrayType(ulongToNumber(lenValue), 4));
 
 		this.callFunction(func, 1, buffer, len.ref());
 
@@ -168,27 +171,20 @@ export class PKCS11Lib implements ILibInterface {
 		return slotId.deref();
 	}
 
-	C_GetMechanismList() {
+	C_GetMechanismList(slotId: TULong) {
 		const len = alloc('ulong', 0);
 		const func = new ForeignFunction(
 			this.lib.get(EPKCSFunctions.C_GetMechanismList),
 			'ulong',
-			['uchar', 'ulong *', 'ulong *'],
+			['ulong', 'ulong *', 'ulong *'],
 		);
 
-		this.callFunction(func, 1, NULL, len);
+		this.callFunction(func, slotId, NULL, len);
 
 		const lenValue = len.deref();
+		const buffer = alloc(buildUIntArrayType(ulongToNumber(lenValue), 4));
 
-		if (typeof lenValue === 'string') {
-			throw new Error(
-				'Слишком много механизмов, столько не бывает: ' + lenValue,
-			);
-		}
-
-		const buffer = alloc(buildUIntArrayType(lenValue, 4));
-
-		this.callFunction(func, 1, buffer, len.ref());
+		this.callFunction(func, slotId, buffer, len.ref());
 
 		return buffer.deref();
 	}
@@ -310,13 +306,7 @@ export class PKCS11Lib implements ILibInterface {
 
 		if (stateLength === 0) return null;
 
-		return readPointer(
-			buffer,
-			0,
-			typeof stateLength === 'number'
-				? stateLength
-				: Number.parseInt(stateLength),
-		);
+		return readPointer(buffer, 0, ulongToNumber(stateLength));
 	}
 
 	C_SetOperationState(
@@ -514,14 +504,7 @@ export class PKCS11Lib implements ILibInterface {
 		this.callFunction(func, sessionId, idsBuffer, packSize, actualCount);
 		const uLongActualCount = actualCount.deref();
 
-		return idsBuffer
-			.toArray()
-			.slice(
-				0,
-				typeof uLongActualCount === 'string'
-					? Number.parseInt(uLongActualCount)
-					: uLongActualCount,
-			);
+		return idsBuffer.toArray().slice(0, ulongToNumber(uLongActualCount));
 	}
 
 	C_FindObjectsFinal(sessionId: TULong) {
@@ -534,32 +517,387 @@ export class PKCS11Lib implements ILibInterface {
 		this.callFunction(func, sessionId);
 	}
 
-	C_EncryptInit: (...p: any[]) => number;
-	C_Encrypt: (...p: any[]) => number;
-	C_EncryptUpdate: (...p: any[]) => number;
-	C_EncryptFinal: (...p: any[]) => number;
+	C_EncryptInit(sessionId: TULong, mechanism: IMechanism, objectId: TULong) {
+		const mechBuffer = alloc(mechanismType, mechanism);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_EncryptInit),
+			'ulong',
+			['ulong', refType(mechanismType), 'ulong'],
+		);
 
-	C_DecryptInit: (...p: any[]) => number;
-	C_Decrypt: (...p: any[]) => number;
-	C_DecryptUpdate: (...p: any[]) => number;
-	C_DecryptFinal: (...p: any[]) => number;
+		this.callFunction(func, sessionId, mechBuffer, objectId);
+	}
 
-	C_DigestInit: (...p: any[]) => number;
-	C_Digest: (...p: any[]) => number;
-	C_DigestUpdate: (...p: any[]) => number;
-	C_DigestKey: (...p: any[]) => number;
-	C_DigestFinal: (...p: any[]) => number;
+	C_Encrypt(sessionId: TULong, dataForEncrypt: Buffer) {
+		const inputBuffer = alloc('byte *', dataForEncrypt);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_Encrypt),
+			'ulong',
+			['ulong', 'byte *', 'ulong', 'void *', 'ulong *'],
+		);
+		const lengthBuffer = alloc('ulong');
+		const outPointerBuffer = alloc('void *');
 
-	C_SignInit: (...p: any[]) => number;
-	C_Sign: (...p: any[]) => number;
-	C_SignUpdate: (...p: any[]) => number;
-	C_SignFinal: (...p: any[]) => number;
-	C_SignRecoverInit: (...p: any[]) => number;
-	C_SignRecover: (...p: any[]) => number;
+		this.callFunction(
+			func,
+			sessionId,
+			inputBuffer,
+			dataForEncrypt.length,
+			outPointerBuffer,
+			lengthBuffer,
+		);
 
-	C_VerifyInit: (...p: any[]) => number;
-	C_Verify: (...p: any[]) => number;
-	C_VerifyUpdate: (...p: any[]) => number;
+		return readPointer(
+			outPointerBuffer,
+			ulongToNumber(lengthBuffer.deref()),
+		);
+	}
+
+	C_EncryptUpdate(sessionId: TULong, dataForEncrypt: Buffer) {
+		const inputBuffer = alloc('byte *', dataForEncrypt);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_EncryptUpdate),
+			'ulong',
+			['ulong', 'byte *', 'ulong', 'void *', 'ulong *'],
+		);
+		const lengthBuffer = alloc('ulong');
+		const outPointerBuffer = alloc('void *');
+
+		this.callFunction(
+			func,
+			sessionId,
+			inputBuffer,
+			dataForEncrypt.length,
+			outPointerBuffer,
+			lengthBuffer,
+		);
+
+		return readPointer(
+			outPointerBuffer,
+			ulongToNumber(lengthBuffer.deref()),
+		);
+	}
+
+	C_EncryptFinal(sessionId: TULong) {
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_EncryptUpdate),
+			'ulong',
+			['ulong', 'byte *', 'ulong'],
+		);
+		const lengthBuffer = alloc('ulong');
+		const outPointerBuffer = alloc('void *');
+
+		this.callFunction(func, sessionId, outPointerBuffer, lengthBuffer);
+
+		return readPointer(
+			outPointerBuffer,
+			ulongToNumber(lengthBuffer.deref()),
+		);
+	}
+
+	C_DecryptInit(sessionId: TULong, mechanism: IMechanism, keyId: TULong) {
+		const mechBuffer = alloc(mechanismType, mechanism);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_DecryptInit),
+			'ulong',
+			['ulong', refType(mechanismType), 'ulong'],
+		);
+
+		this.callFunction(func, sessionId, mechBuffer, keyId);
+	}
+
+	C_Decrypt(sessionId: TULong, dataForDecrypt: Buffer) {
+		const inputBuffer = alloc('byte *', dataForDecrypt);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_Decrypt),
+			'ulong',
+			['ulong', 'byte *', 'ulong', 'void *', 'ulong *'],
+		);
+		const lengthBuffer = alloc('ulong');
+		const outPointerBuffer = alloc('void *');
+
+		this.callFunction(
+			func,
+			sessionId,
+			inputBuffer,
+			dataForDecrypt.length,
+			outPointerBuffer,
+			lengthBuffer,
+		);
+
+		return readPointer(
+			outPointerBuffer,
+			ulongToNumber(lengthBuffer.deref()),
+		);
+	}
+
+	C_DecryptUpdate(sessionId: TULong, dataForDecrypt: Buffer) {
+		const inputBuffer = alloc('byte *', dataForDecrypt);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_DecryptUpdate),
+			'ulong',
+			['ulong', 'byte *', 'ulong', 'void *', 'ulong *'],
+		);
+		const lengthBuffer = alloc('ulong');
+		const outPointerBuffer = alloc('void *');
+
+		this.callFunction(
+			func,
+			sessionId,
+			inputBuffer,
+			dataForDecrypt.length,
+			outPointerBuffer,
+			lengthBuffer,
+		);
+
+		return readPointer(
+			outPointerBuffer,
+			ulongToNumber(lengthBuffer.deref()),
+		);
+	}
+
+	C_DecryptFinal(sessionId: TULong) {
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_DecryptFinal),
+			'ulong',
+			['ulong', 'byte *', 'ulong'],
+		);
+		const lengthBuffer = alloc('ulong');
+		const outPointerBuffer = alloc('void *');
+
+		this.callFunction(func, sessionId, outPointerBuffer, lengthBuffer);
+
+		return readPointer(
+			outPointerBuffer,
+			ulongToNumber(lengthBuffer.deref()),
+		);
+	}
+
+	C_DigestInit(sessionId: TULong, mechanism: IMechanism) {
+		const mechBuffer = alloc(mechanismType, mechanism);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_DecryptInit),
+			'ulong',
+			['ulong', refType(mechanismType)],
+		);
+
+		this.callFunction(func, sessionId, mechBuffer);
+	}
+
+	C_Digest(sessionId: TULong, dataForDecrypt: Buffer) {
+		const inputBuffer = alloc('byte *', dataForDecrypt);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_Digest),
+			'ulong',
+			['ulong', 'byte *', 'ulong', 'void *', 'ulong *'],
+		);
+		const lengthBuffer = alloc('ulong');
+		const outPointerBuffer = alloc('void *');
+
+		this.callFunction(
+			func,
+			sessionId,
+			inputBuffer,
+			dataForDecrypt.length,
+			outPointerBuffer,
+			lengthBuffer,
+		);
+
+		return readPointer(
+			outPointerBuffer,
+			ulongToNumber(lengthBuffer.deref()),
+		);
+	}
+
+	C_DigestUpdate(sessionId: TULong, dataForDecrypt: Buffer) {
+		const inputBuffer = alloc('byte *', dataForDecrypt);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_Digest),
+			'ulong',
+			['ulong', 'byte *', 'ulong'],
+		);
+
+		this.callFunction(func, sessionId, inputBuffer, dataForDecrypt.length);
+	}
+
+	C_DigestKey(sessionId: TULong, keyId: TULong) {
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_DigestKey),
+			'ulong',
+			['ulong', 'ulong'],
+		);
+
+		this.callFunction(func, sessionId, keyId);
+	}
+
+	C_DigestFinal(sessionId: TULong) {
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_DigestFinal),
+			'ulong',
+			['ulong', 'void *', 'ulong *'],
+		);
+		const lengthBuffer = alloc('ulong');
+		const outPointerBuffer = alloc('void *');
+
+		this.callFunction(func, sessionId, outPointerBuffer, lengthBuffer);
+
+		return readPointer(
+			outPointerBuffer,
+			ulongToNumber(lengthBuffer.deref()),
+		);
+	}
+
+	C_SignInit(sessionId: TULong, mechanism: IMechanism, keyId: TULong) {
+		const mechBuffer = alloc(mechanismType, mechanism);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_SignInit),
+			'ulong',
+			['ulong', refType(mechanismType), 'ulong'],
+		);
+
+		this.callFunction(func, sessionId, mechBuffer, keyId);
+	}
+
+	C_Sign(sessionId: TULong, dataForSign: Buffer) {
+		const inputBuffer = alloc('byte *', dataForSign);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_Sign),
+			'ulong',
+			['ulong', 'byte *', 'ulong', 'void *', 'ulong *'],
+		);
+		const lengthBuffer = alloc('ulong');
+		const outPointerBuffer = alloc('void *');
+
+		this.callFunction(
+			func,
+			sessionId,
+			inputBuffer,
+			dataForSign.length,
+			outPointerBuffer,
+			lengthBuffer,
+		);
+
+		return readPointer(
+			outPointerBuffer,
+			ulongToNumber(lengthBuffer.deref()),
+		);
+	}
+
+	C_SignUpdate(sessionId: TULong, dataForSign: Buffer) {
+		const inputBuffer = alloc('byte *', dataForSign);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_SignUpdate),
+			'ulong',
+			['ulong', 'byte *', 'ulong'],
+		);
+
+		this.callFunction(func, sessionId, inputBuffer, dataForSign.length);
+	}
+
+	C_SignFinal(sessionId: TULong) {
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_SignFinal),
+			'ulong',
+			['ulong', 'void *', 'ulong *'],
+		);
+		const lengthBuffer = alloc('ulong');
+		const outPointerBuffer = alloc('void *');
+
+		this.callFunction(func, sessionId, outPointerBuffer, lengthBuffer);
+
+		return readPointer(
+			outPointerBuffer,
+			ulongToNumber(lengthBuffer.deref()),
+		);
+	}
+
+	C_SignRecoverInit(sessionId: TULong, mechanism: IMechanism, keyId: TULong) {
+		const mechBuffer = alloc(mechanismType, mechanism);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_SignRecoverInit),
+			'ulong',
+			['ulong', refType(mechanismType), 'ulong'],
+		);
+
+		this.callFunction(func, sessionId, mechBuffer, keyId);
+	}
+
+	C_SignRecover(sessionId: TULong, dataForSign: Buffer) {
+		const inputBuffer = alloc('byte *', dataForSign);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_SignRecover),
+			'ulong',
+			['ulong', 'byte *', 'ulong', 'void *', 'ulong *'],
+		);
+		const lengthBuffer = alloc('ulong');
+		const outPointerBuffer = alloc('void *');
+
+		this.callFunction(
+			func,
+			sessionId,
+			inputBuffer,
+			dataForSign.length,
+			outPointerBuffer,
+			lengthBuffer,
+		);
+
+		return readPointer(
+			outPointerBuffer,
+			ulongToNumber(lengthBuffer.deref()),
+		);
+	}
+
+	C_VerifyInit(sessionId: TULong, mechanism: IMechanism, keyId: TULong) {
+		const mechBuffer = alloc(mechanismType, mechanism);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_VerifyInit),
+			'ulong',
+			['ulong', refType(mechanismType), 'ulong'],
+		);
+
+		this.callFunction(func, sessionId, mechBuffer, keyId);
+	}
+
+	/**
+	 * тестировать. совершенно не понятно, как это должно работать
+	 */
+	C_Verify(sessionId: TULong, dataForVerify: Buffer) {
+		const inputBuffer = alloc('byte *', dataForVerify);
+		//const signBuffer = alloc('byte *', sign);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_Sign),
+			'ulong',
+			['ulong', 'byte *', 'ulong', 'void *', 'ulong *'],
+		);
+		const lengthBuffer = alloc('ulong');
+		const outPointerBuffer = alloc('void *');
+
+		this.callFunction(
+			func,
+			sessionId,
+			inputBuffer,
+			dataForVerify.length,
+			outPointerBuffer,
+			lengthBuffer,
+		);
+
+		return readPointer(
+			outPointerBuffer,
+			ulongToNumber(lengthBuffer.deref()),
+		);
+	}
+
+	C_VerifyUpdate(sessionId: TULong, dataForVerify: Buffer) {
+		const inputBuffer = alloc('byte *', dataForVerify);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_Sign),
+			'ulong',
+			['ulong', 'byte *', 'ulong'],
+		);
+
+		this.callFunction(func, sessionId, inputBuffer, dataForVerify.length);
+	}
+
 	C_VerifyFinal: (...p: any[]) => number;
 	C_VerifyRecoverInit: (...p: any[]) => number;
 	C_VerifyRecover: (...p: any[]) => number;
@@ -576,8 +914,27 @@ export class PKCS11Lib implements ILibInterface {
 	C_UnwrapKey: (...p: any[]) => number;
 	C_DeriveKey: (...p: any[]) => number;
 
-	C_SeedRandom: (...p: any[]) => number;
-	C_GenerateRandom: (...p: any[]) => number;
+	C_SeedRandom(sessionId: TULong, seed: Buffer) {
+		const seedBuffer = alloc('byte *', seed);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_GenerateRandom),
+			'ulong',
+			['ulong', 'byte *', 'ulong'],
+		);
+		this.callFunction(func, sessionId, seedBuffer, seed.length);
+	}
+
+	C_GenerateRandom(sessionId: TULong, length: number) {
+		const outPointerBuffer = alloc('void *');
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_GenerateRandom),
+			'ulong',
+			['ulong', 'byte *', 'ulong'],
+		);
+		this.callFunction(func, sessionId, outPointerBuffer, length);
+
+		return readPointer(outPointerBuffer, ulongToNumber(length));
+	}
 	/**
 	 * @deprecated
 	 */

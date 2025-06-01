@@ -11,9 +11,11 @@
 		"lastVersion": "0.0.0"
 	},
 	"scripts": {
-		"tsc": "tsc",
+		"test": "jest",
+		"tsc": "tsc --resolveJsonModule",
 		"eslint": "eslint",
-		"build": "npm run tsc",
+		"build": "npm run tsc -p ./tsconfig.release.json",
+		"build:dev": "npm run tsc",
 		"reset-latest": "npx cross-var \"npm dist-tag set $npm_package_name@$npm_package_config_lastVersion latest -f\"",
 		"unpublish": "npx cross-var \"npm unpublish $npm_package_name@$npm_package_version -f\" && npm run reset-latest",
 		"republish": "npm run build && npm run unpublish && npm publish -f"
@@ -24,21 +26,30 @@
 	"author": "Muraviev I.V. <ger0strat@yandex.ru>",
 	"license": "ISC",
 	"dependencies": {
+		"@jridgewell/trace-mapping": "^0.3.25",
 		"ffi-napi": "^4.0.3",
 		"ref-array-di": "^1.2.2",
 		"ref-napi": "^3.0.3",
 		"ref-struct-di": "^1.1.1"
 	},
 	"devDependencies": {
+		"@babel/core": "^7.27.4",
+		"@babel/preset-env": "^7.27.2",
+		"@babel/preset-typescript": "^7.27.1",
 		"@types/ffi-napi": "^4.0.10",
+		"@types/jest": "^29.5.14",
 		"@types/ref-array-di": "^1.2.8",
 		"@types/ref-napi": "^3.0.12",
 		"@typescript-eslint/eslint-plugin": "^8.32.1",
 		"@typescript-eslint/parser": "^8.32.1",
+		"babel-jest": "^29.7.0",
 		"eslint": "^9.26.0",
 		"eslint-config-prettier": "^10.1.5",
 		"eslint-plugin-prettier": "^5.4.0",
-		"prettier": "^3.5.3"
+		"jest": "^29.7.0",
+		"prettier": "^3.5.3",
+		"ts-jest": "^29.3.4",
+		"ts-node": "^10.9.2"
 	},
 	"peerDependencies": {
 		"typescript": "^5.8.3"

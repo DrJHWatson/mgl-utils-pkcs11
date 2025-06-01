@@ -19,13 +19,7 @@
 		"esModuleInterop": true,
 		"strict": true,
 		"baseUrl": ".",
-		"typeRoots": ["./dist/global.d.ts", "node_modules/@types"],
-		"types": ["jest", "node"],
-		"paths": {
-			"@/*": ["./src/*"]
-		},
-		//"inlineSourceMap": true,
-		"resolveJsonModule": true
+		"typeRoots": ["./dist/global.d.ts"]
 	},
-	"include": ["src", "__tests__/t2est.ts", "__tests__"]
+	"include": ["src"]
 }

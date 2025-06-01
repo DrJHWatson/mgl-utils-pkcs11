@@ -137,6 +137,12 @@ export enum EPKCSFunctions {
 	C_CancelFunction = 'C_CancelFunction',
 }
 
+export enum ESlotFlags {
+	CKF_TOKEN_PRESENT = 0x1,
+	CKF_REMOVABLE_DEVICE = 0x2,
+	CKF_HW_SLOT = 0x4,
+}
+
 export enum EPKCSResults {
 	CKR_OK = 0x0,
 	CKR_CANCEL = 0x1,
