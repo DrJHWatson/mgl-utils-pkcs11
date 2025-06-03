@@ -1,4 +1,4 @@
-import { EAttributeType, EPKCSMechanism } from './LibEnums';
+import { EAttributeType, EPKCSMechanism, ESessionState } from './LibEnums';
 
 export interface IVersion {
 	minor: number;
@@ -61,7 +61,7 @@ export enum ESessionInfoFlag {
 
 export interface ISessionInfo {
 	slotID: number;
-	state: number;
+	state: ESessionState;
 	flags: number;
 	ulDeviceError: number;
 }

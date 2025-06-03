@@ -353,7 +353,7 @@ export class PKCS11Lib implements ILibInterface {
 	}
 
 	C_CreateObject(sessionId: TULong, template: IAttribute[]) {
-		const TemplateType = new ArrayType(attributeType, template.length);
+		const TemplateType = ArrayType(attributeType, template.length);
 		const templateBuffer = new TemplateType();
 		const handle = alloc('ulong', 0);
 
@@ -362,13 +362,13 @@ export class PKCS11Lib implements ILibInterface {
 		const func = new ForeignFunction(
 			this.lib.get(EPKCSFunctions.C_CreateObject),
 			'ulong',
-			['ulong', TemplateType, 'ulong', refType('ulong')],
+			['ulong', 'byte *', 'ulong', refType('ulong')],
 		);
 
 		this.callFunction(
 			func,
 			sessionId,
-			templateBuffer,
+			templateBuffer.buffer,
 			template.length,
 			handle,
 		);
@@ -377,7 +377,7 @@ export class PKCS11Lib implements ILibInterface {
 	}
 
 	C_CopyObject(sessionId: TULong, sourceId: TULong, template: IAttribute[]) {
-		const TemplateType = new ArrayType(attributeType, template.length);
+		const TemplateType = ArrayType(attributeType, template.length);
 		const templateBuffer = new TemplateType();
 		const handle = alloc('ulong', 0);
 
@@ -386,14 +386,14 @@ export class PKCS11Lib implements ILibInterface {
 		const func = new ForeignFunction(
 			this.lib.get(EPKCSFunctions.C_CopyObject),
 			'ulong',
-			['ulong', 'ulong', TemplateType, 'ulong', refType('ulong')],
+			['ulong', 'ulong', 'byte *', 'ulong', refType('ulong')],
 		);
 
 		this.callFunction(
 			func,
 			sessionId,
 			sourceId,
-			templateBuffer,
+			templateBuffer.buffer,
 			template.length,
 			handle,
 		);
@@ -424,12 +424,19 @@ export class PKCS11Lib implements ILibInterface {
 		return size.deref();
 	}
 
+	/**
+	 *
+	 * @param sessionId
+	 * @param sourceId
+	 * @param template буфер для значений, записываться будет по этому же адресу
+	 * @returns
+	 */
 	C_GetAttributeValue(
 		sessionId: TULong,
 		sourceId: TULong,
 		template: IAttribute[],
 	) {
-		const TemplateType = new ArrayType(attributeType, template.length);
+		const TemplateType = ArrayType(attributeType, template.length);
 		const templateBuffer = new TemplateType();
 
 		template.forEach((value, index) => (templateBuffer[index] = value));
@@ -437,14 +444,14 @@ export class PKCS11Lib implements ILibInterface {
 		const func = new ForeignFunction(
 			this.lib.get(EPKCSFunctions.C_GetAttributeValue),
 			'ulong',
-			['ulong', 'ulong', TemplateType, 'ulong'],
+			['ulong', 'ulong', 'byte *', 'ulong'],
 		);
 
 		this.callFunction(
 			func,
 			sessionId,
 			sourceId,
-			templateBuffer,
+			templateBuffer.buffer,
 			template.length,
 		);
 
@@ -456,7 +463,7 @@ export class PKCS11Lib implements ILibInterface {
 		sourceId: TULong,
 		template: IAttribute[],
 	) {
-		const TemplateType = new ArrayType(attributeType, template.length);
+		const TemplateType = ArrayType(attributeType, template.length);
 		const templateBuffer = new TemplateType();
 
 		template.forEach((value, index) => (templateBuffer[index] = value));
@@ -464,20 +471,20 @@ export class PKCS11Lib implements ILibInterface {
 		const func = new ForeignFunction(
 			this.lib.get(EPKCSFunctions.C_SetAttributeValue),
 			'ulong',
-			['ulong', 'ulong', TemplateType, 'ulong'],
+			['ulong', 'ulong', 'byte *', 'ulong'],
 		);
 
 		this.callFunction(
 			func,
 			sessionId,
 			sourceId,
-			templateBuffer,
+			templateBuffer.buffer,
 			template.length,
 		);
 	}
 
 	C_FindObjectsInit(sessionId: TULong, template: IAttribute[]) {
-		const TemplateType = new ArrayType(attributeType, template.length);
+		const TemplateType = ArrayType(attributeType, template.length);
 		const templateBuffer = new TemplateType();
 
 		template.forEach((value, index) => (templateBuffer[index] = value));
@@ -485,23 +492,34 @@ export class PKCS11Lib implements ILibInterface {
 		const func = new ForeignFunction(
 			this.lib.get(EPKCSFunctions.C_FindObjectsInit),
 			'ulong',
-			['ulong', TemplateType, 'ulong'],
+			['ulong', 'byte *', 'ulong'],
 		);
 
-		this.callFunction(func, sessionId, templateBuffer, template.length);
+		this.callFunction(
+			func,
+			sessionId,
+			templateBuffer.buffer,
+			template.length,
+		);
 	}
 
 	C_FindObjects(sessionId: TULong, packSize: number = 100) {
-		const IdsType = new ArrayType('ulong', packSize);
+		const IdsType = ArrayType('ulong', packSize);
 		const idsBuffer = new IdsType();
 		const actualCount = alloc('ulong', 0);
 		const func = new ForeignFunction(
 			this.lib.get(EPKCSFunctions.C_FindObjects),
 			'ulong',
-			['ulong', IdsType, 'ulong', refType('ulong')],
+			['ulong', 'void *', 'ulong', refType('ulong')],
 		);
 
-		this.callFunction(func, sessionId, idsBuffer, packSize, actualCount);
+		this.callFunction(
+			func,
+			sessionId,
+			idsBuffer.buffer,
+			packSize,
+			actualCount,
+		);
 		const uLongActualCount = actualCount.deref();
 
 		return idsBuffer.toArray().slice(0, ulongToNumber(uLongActualCount));
@@ -676,7 +694,7 @@ export class PKCS11Lib implements ILibInterface {
 	C_DigestInit(sessionId: TULong, mechanism: IMechanism) {
 		const mechBuffer = alloc(mechanismType, mechanism);
 		const func = new ForeignFunction(
-			this.lib.get(EPKCSFunctions.C_DecryptInit),
+			this.lib.get(EPKCSFunctions.C_DigestInit),
 			'ulong',
 			['ulong', refType(mechanismType)],
 		);
@@ -684,40 +702,35 @@ export class PKCS11Lib implements ILibInterface {
 		this.callFunction(func, sessionId, mechBuffer);
 	}
 
-	C_Digest(sessionId: TULong, dataForDecrypt: Buffer) {
-		const inputBuffer = alloc('byte *', dataForDecrypt);
+	C_Digest(sessionId: TULong, dataForDigest: Buffer, digestLength: number) {
 		const func = new ForeignFunction(
 			this.lib.get(EPKCSFunctions.C_Digest),
 			'ulong',
 			['ulong', 'byte *', 'ulong', 'void *', 'ulong *'],
 		);
-		const lengthBuffer = alloc('ulong');
-		const outPointerBuffer = alloc('void *');
+		const lengthBuffer = alloc('ulong', digestLength);
+		const outBuffer = Buffer.alloc(digestLength);
 
 		this.callFunction(
 			func,
 			sessionId,
-			inputBuffer,
-			dataForDecrypt.length,
-			outPointerBuffer,
+			dataForDigest,
+			dataForDigest.length,
+			outBuffer,
 			lengthBuffer,
 		);
 
-		return readPointer(
-			outPointerBuffer,
-			ulongToNumber(lengthBuffer.deref()),
-		);
+		return outBuffer.subarray(0, ulongToNumber(lengthBuffer.deref()));
 	}
 
-	C_DigestUpdate(sessionId: TULong, dataForDecrypt: Buffer) {
-		const inputBuffer = alloc('byte *', dataForDecrypt);
+	C_DigestUpdate(sessionId: TULong, dataForDigest: Buffer) {
 		const func = new ForeignFunction(
-			this.lib.get(EPKCSFunctions.C_Digest),
+			this.lib.get(EPKCSFunctions.C_DigestUpdate),
 			'ulong',
 			['ulong', 'byte *', 'ulong'],
 		);
 
-		this.callFunction(func, sessionId, inputBuffer, dataForDecrypt.length);
+		this.callFunction(func, sessionId, dataForDigest, dataForDigest.length);
 	}
 
 	C_DigestKey(sessionId: TULong, keyId: TULong) {
@@ -730,21 +743,17 @@ export class PKCS11Lib implements ILibInterface {
 		this.callFunction(func, sessionId, keyId);
 	}
 
-	C_DigestFinal(sessionId: TULong) {
+	C_DigestFinal(sessionId: TULong, digestLength: number) {
 		const func = new ForeignFunction(
 			this.lib.get(EPKCSFunctions.C_DigestFinal),
 			'ulong',
-			['ulong', 'void *', 'ulong *'],
+			['ulong', 'byte *', 'ulong *'],
 		);
-		const lengthBuffer = alloc('ulong');
-		const outPointerBuffer = alloc('void *');
+		const lengthBuffer = alloc('ulong', digestLength);
+		const outBuffer = Buffer.alloc(digestLength);
+		this.callFunction(func, sessionId, outBuffer, lengthBuffer);
 
-		this.callFunction(func, sessionId, outPointerBuffer, lengthBuffer);
-
-		return readPointer(
-			outPointerBuffer,
-			ulongToNumber(lengthBuffer.deref()),
-		);
+		return outBuffer.subarray(0, ulongToNumber(lengthBuffer.deref()));
 	}
 
 	C_SignInit(sessionId: TULong, mechanism: IMechanism, keyId: TULong) {
@@ -909,7 +918,62 @@ export class PKCS11Lib implements ILibInterface {
 	C_DecryptVerifyUpdate: (...p: any[]) => number;
 
 	C_GenerateKey: (...p: any[]) => number;
-	C_GenerateKeyPair: (...p: any[]) => number;
+	C_GenerateKeyPair(
+		sessionId: TULong,
+		mechanism: IMechanism,
+		publicKeyTemplate: IAttribute[],
+		privateKeyTemplate: IAttribute[],
+	) {
+		const PubTemplateType = ArrayType(
+			attributeType,
+			publicKeyTemplate.length,
+		);
+		publicKeyTemplate.forEach(
+			(value, index) => (pubKeyTemplateBuffer[index] = value),
+		);
+		const pubKeyTemplateBuffer = new PubTemplateType();
+		const PrivTemplateType = ArrayType(
+			attributeType,
+			privateKeyTemplate.length,
+		);
+		privateKeyTemplate.forEach(
+			(value, index) => (privKeyTemplateBuffer[index] = value),
+		);
+		const privKeyTemplateBuffer = new PrivTemplateType();
+		const mechBuffer = alloc(mechanismType, mechanism);
+		const func = new ForeignFunction(
+			this.lib.get(EPKCSFunctions.C_DigestInit),
+			'ulong',
+			[
+				'ulong',
+				refType(mechanismType),
+				'byte *',
+				'ulong',
+				'byte *',
+				'ulong',
+				'ulong *',
+				'ulong *',
+			],
+		);
+		const publicKeyId = alloc('ulong', 0);
+		const privateKeyId = alloc('ulong', 0);
+
+		this.callFunction(
+			func,
+			sessionId,
+			mechBuffer,
+			pubKeyTemplateBuffer.buffer,
+			publicKeyTemplate.length,
+			privKeyTemplateBuffer.buffer,
+			privateKeyTemplate.length,
+			publicKeyId,
+			privateKeyId,
+		);
+		return {
+			publicKeyId: publicKeyId.deref(),
+			privateKeyId: privateKeyId.deref(),
+		};
+	}
 	C_WrapKey: (...p: any[]) => number;
 	C_UnwrapKey: (...p: any[]) => number;
 	C_DeriveKey: (...p: any[]) => number;

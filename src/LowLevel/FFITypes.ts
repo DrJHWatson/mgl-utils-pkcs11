@@ -213,8 +213,13 @@ export const mechanismType: Type<IMechanism> = {
 	},
 	set(buffer, offset, value) {
 		buffer.writeUInt32LE(value.type, offset);
-		buffer.writeUInt64LE(value.data.address(), offset + 4);
-		buffer.writeUInt32LE(value.data.length, offset + 12);
+		if (value.data === null) {
+			buffer.writeBigUInt64LE(BigInt(0), offset + 4);
+			buffer.writeUInt32LE(0, offset + 12);
+		} else {
+			buffer.writeUInt64LE(value.data.address(), offset + 4);
+			buffer.writeUInt32LE(value.data.length, offset + 12);
+		}
 	},
 	indirection: 1,
 	size: 16,

@@ -8,7 +8,8 @@ import {
 	tokenInfoType,
 	versionType,
 } from '@/LowLevel/FFITypes';
-import { EPKCSMechanism } from '@/LowLevel/LibEnums';
+import { EPKCSMechanism, ESessionState } from '@/LowLevel/LibEnums';
+import { buildUIntArrayType } from '@/LowLevel/Utils';
 import { Type } from 'ref-napi';
 
 type TTypeBase<T> = T extends Type<infer M> ? M : never;
@@ -39,7 +40,7 @@ describe('ffi types', () => {
 		const { source, restored } = runTypeTest(sessionInfoType, {
 			flags: 123,
 			slotID: 124,
-			state: 125,
+			state: ESessionState.CKS_RW_SO_FUNCTIONS,
 			ulDeviceError: 126,
 		});
 
@@ -142,6 +143,14 @@ describe('ffi types', () => {
 			data: Buffer.from('some data'),
 		});
 
+		expect(restored).toEqual(source);
+	});
+
+	test('uint array', () => {
+		const { source, restored } = runTypeTest(
+			buildUIntArrayType(4, 4),
+			[1, 2, 3, 4],
+		);
 		expect(restored).toEqual(source);
 	});
 });
