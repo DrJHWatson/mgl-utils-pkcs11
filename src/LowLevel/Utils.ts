@@ -1,5 +1,8 @@
 import { Type } from 'ref-napi';
-import { TULong } from './LibTypes';
+import { IAttribute, TULong } from './LibTypes';
+import { EKeyConsumer } from './LibEnums';
+import { TKeyTemplate } from './LibObjects';
+import { objectToAttributes } from './LibObjectTemplates';
 
 export function buildUIntArrayType(
 	count: number,
@@ -35,4 +38,10 @@ export function ulongToNumber(value: TULong): number {
 	if (typeof value === 'string') return Number.parseInt(value);
 
 	return value;
+}
+
+export function makeKeyTemplate<Consumer extends EKeyConsumer>(
+	objectTemplate: TKeyTemplate<Consumer>,
+): IAttribute[] {
+	return objectToAttributes(objectTemplate);
 }

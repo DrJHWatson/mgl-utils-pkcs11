@@ -73,6 +73,7 @@ export const mechanismInfoType: Type<IMechanismInfo> = {
 
 export const tokenInfoType: Type<ITokenInfo> = {
 	get(buffer, offset) {
+		//('tokeninfo length ' + buffer.length.toString());
 		return {
 			label: trimZeros(buffer.subarray(offset, offset + 32).toString()),
 			manufacturerID: trimZeros(
@@ -203,11 +204,11 @@ export const versionType: Type<IVersion> = {
 export const mechanismType: Type<IMechanism> = {
 	get(buffer, offset) {
 		return {
-			type: buffer.readInt32LE(offset),
+			type: buffer.readUInt32LE(offset),
 			data: readPointer(
 				buffer,
 				offset + 4,
-				buffer.readInt32LE(offset + 12),
+				buffer.readUInt32LE(offset + 12),
 			),
 		};
 	},

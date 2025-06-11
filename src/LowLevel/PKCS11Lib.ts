@@ -1,19 +1,6 @@
-import {
-	EPKCSResults,
-	EPKCSFunctions,
-	EUserType,
-	EPKCSMechanism,
-} from './LibEnums';
+import { EPKCSResults, EPKCSFunctions, EUserType } from './LibEnums';
 import refModule, { alloc, NULL, readPointer, refType } from 'ref-napi';
-import {
-	IAttribute,
-	ILibInfo,
-	IMechanism,
-	IMechanismInfo,
-	ISlotInfo,
-	ITokenInfo,
-	TULong,
-} from './LibTypes';
+import { IAttribute, IMechanism, ITokenInfo, TULong } from './LibTypes';
 import { DynamicLibrary, ForeignFunction } from 'ffi-napi';
 import {
 	attributeType,
@@ -29,28 +16,11 @@ import array from 'ref-array-di';
 
 const ArrayType = array(refModule);
 
-interface ILibInterface extends Record<EPKCSFunctions, (...p: any[]) => void> {
-	[EPKCSFunctions.C_Initialize]: () => void;
-	[EPKCSFunctions.C_Finalize]: () => void;
-	[EPKCSFunctions.C_GetInfo]: () => ILibInfo;
-	[EPKCSFunctions.C_GetSlotList]: () => Array<number>;
-	[EPKCSFunctions.C_GetSlotInfo]: (id: TULong) => ISlotInfo;
-	[EPKCSFunctions.C_GetTokenInfo]: (slotId: TULong) => ITokenInfo;
-	[EPKCSFunctions.C_WaitForSlotEvent]: (dontBlock: boolean) => TULong;
-	[EPKCSFunctions.C_GetMechanismList]: (
-		slotId: TULong,
-	) => Array<EPKCSMechanism>;
-	[EPKCSFunctions.C_GetMechanismInfo]: (
-		slotId: TULong,
-		mechanismType: TULong,
-	) => IMechanismInfo;
-}
-
 type TErrors = (keyof typeof EPKCSResults)[];
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { CKR_OK, CKR_NO_EVENT, ...errorsObject } = EPKCSResults;
 const errors: TErrors = Object.keys(errorsObject) as TErrors;
-export class PKCS11Lib implements ILibInterface {
+export class PKCS11Lib {
 	private lib: DynamicLibrary;
 
 	constructor(path: string) {
@@ -535,7 +505,7 @@ export class PKCS11Lib implements ILibInterface {
 		this.callFunction(func, sessionId);
 	}
 
-	C_EncryptInit(sessionId: TULong, mechanism: IMechanism, objectId: TULong) {
+	C_EncryptInit(sessionId: TULong, mechanism: IMechanism, keyId: TULong) {
 		const mechBuffer = alloc(mechanismType, mechanism);
 		const func = new ForeignFunction(
 			this.lib.get(EPKCSFunctions.C_EncryptInit),
@@ -543,32 +513,37 @@ export class PKCS11Lib implements ILibInterface {
 			['ulong', refType(mechanismType), 'ulong'],
 		);
 
-		this.callFunction(func, sessionId, mechBuffer, objectId);
+		this.callFunction(func, sessionId, mechBuffer, keyId);
 	}
 
 	C_Encrypt(sessionId: TULong, dataForEncrypt: Buffer) {
-		const inputBuffer = alloc('byte *', dataForEncrypt);
 		const func = new ForeignFunction(
 			this.lib.get(EPKCSFunctions.C_Encrypt),
 			'ulong',
 			['ulong', 'byte *', 'ulong', 'void *', 'ulong *'],
 		);
-		const lengthBuffer = alloc('ulong');
-		const outPointerBuffer = alloc('void *');
-
+		const lengthBuffer = alloc('ulong', 0);
 		this.callFunction(
 			func,
 			sessionId,
-			inputBuffer,
+			dataForEncrypt,
 			dataForEncrypt.length,
-			outPointerBuffer,
+			NULL,
 			lengthBuffer,
 		);
-
-		return readPointer(
-			outPointerBuffer,
-			ulongToNumber(lengthBuffer.deref()),
+		const len = lengthBuffer.deref();
+		const out = Buffer.alloc(
+			typeof len === 'number' ? len : Number.parseInt(len),
 		);
+		this.callFunction(
+			func,
+			sessionId,
+			dataForEncrypt,
+			dataForEncrypt.length,
+			out,
+			lengthBuffer,
+		);
+		return out;
 	}
 
 	C_EncryptUpdate(sessionId: TULong, dataForEncrypt: Buffer) {
@@ -625,28 +600,33 @@ export class PKCS11Lib implements ILibInterface {
 	}
 
 	C_Decrypt(sessionId: TULong, dataForDecrypt: Buffer) {
-		const inputBuffer = alloc('byte *', dataForDecrypt);
 		const func = new ForeignFunction(
 			this.lib.get(EPKCSFunctions.C_Decrypt),
 			'ulong',
 			['ulong', 'byte *', 'ulong', 'void *', 'ulong *'],
 		);
 		const lengthBuffer = alloc('ulong');
-		const outPointerBuffer = alloc('void *');
 
 		this.callFunction(
 			func,
 			sessionId,
-			inputBuffer,
+			dataForDecrypt,
+			dataForDecrypt.length,
+			NULL,
+			lengthBuffer,
+		);
+		const len = lengthBuffer.deref();
+		const outPointerBuffer = Buffer.alloc(ulongToNumber(len));
+		this.callFunction(
+			func,
+			sessionId,
+			dataForDecrypt,
 			dataForDecrypt.length,
 			outPointerBuffer,
 			lengthBuffer,
 		);
 
-		return readPointer(
-			outPointerBuffer,
-			ulongToNumber(lengthBuffer.deref()),
-		);
+		return outPointerBuffer;
 	}
 
 	C_DecryptUpdate(sessionId: TULong, dataForDecrypt: Buffer) {
@@ -928,21 +908,21 @@ export class PKCS11Lib implements ILibInterface {
 			attributeType,
 			publicKeyTemplate.length,
 		);
+		const pubKeyTemplateBuffer = new PubTemplateType();
 		publicKeyTemplate.forEach(
 			(value, index) => (pubKeyTemplateBuffer[index] = value),
 		);
-		const pubKeyTemplateBuffer = new PubTemplateType();
 		const PrivTemplateType = ArrayType(
 			attributeType,
 			privateKeyTemplate.length,
 		);
+		const privKeyTemplateBuffer = new PrivTemplateType();
 		privateKeyTemplate.forEach(
 			(value, index) => (privKeyTemplateBuffer[index] = value),
 		);
-		const privKeyTemplateBuffer = new PrivTemplateType();
 		const mechBuffer = alloc(mechanismType, mechanism);
 		const func = new ForeignFunction(
-			this.lib.get(EPKCSFunctions.C_DigestInit),
+			this.lib.get(EPKCSFunctions.C_GenerateKeyPair),
 			'ulong',
 			[
 				'ulong',

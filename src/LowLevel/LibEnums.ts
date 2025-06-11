@@ -565,6 +565,26 @@ export enum EPKCSMechanism {
 	CKM_VENDOR_DEFINED = 0x80000000,
 }
 
+export enum ECertificateType {
+	CKC_X_509 = 0x0,
+	CKC_X_509_ATTR_CERT = 0x1,
+	CKC_WTLS = 0x2,
+}
+
+export enum ECertificateCategory {
+	UNDEFINED = 0,
+	USER = 1,
+	CA = 2,
+	OTHER = 3,
+}
+
+export enum ECertificateMIDPDomain {
+	UNDEFINED = 0,
+	VENDOR = 1,
+	OPERATOR = 2,
+	THIRD_PARTY = 3,
+}
+
 export enum EUserType {
 	CKU_SO = 0,
 	CKU_USER = 1,
@@ -688,6 +708,8 @@ export enum EAttributeType {
 	CKA_DEFAULT_CMS_ATTRIBUTES = 0x502,
 	CKA_SUPPORTED_CMS_ATTRIBUTES = 0x503,
 	CKA_ALLOWED_MECHANISMS = 0x40000600,
+}
+export enum EAttributeFlags {
 	CKF_ARRAY_ATTRIBUTE = 0x40000000,
 	CKA_VENDOR_DEFINED = 0x80000000,
 }
@@ -733,4 +755,56 @@ export enum EObjectClass {
 	CKO_MECHANISM = 0x7,
 	CKO_OTP_KEY = 0x8,
 	CKO_VENDOR_DEFINED = 0x80000000,
+}
+
+export enum EKeyType {
+	CKK_RSA = 0x0,
+	CKK_DSA = 0x1,
+	CKK_DH = 0x2,
+	CKK_EC = 0x3,
+	CKK_X9_42_DH = 0x4,
+	CKK_KEA = 0x5,
+	CKK_GENERIC_SECRET = 0x10,
+	CKK_RC2 = 0x11,
+	CKK_RC4 = 0x12,
+	CKK_DES = 0x13,
+	CKK_DES2 = 0x14,
+	CKK_DES3 = 0x15,
+	CKK_CAST = 0x16,
+	CKK_CAST3 = 0x17,
+	CKK_CAST128 = 0x18,
+	CKK_RC5 = 0x19,
+	CKK_IDEA = 0x1a,
+	CKK_SKIPJACK = 0x1b,
+	CKK_BATON = 0x1c,
+	CKK_JUNIPER = 0x1d,
+	CKK_CDMF = 0x1e,
+	CKK_AES = 0x1f,
+	CKK_BLOWFISH = 0x20,
+	CKK_TWOFISH = 0x21,
+	CKK_SECURID = 0x22,
+	CKK_HOTP = 0x23,
+	CKK_ACTI = 0x24,
+	CKK_CAMELLIA = 0x25,
+	CKK_ARIA = 0x26,
+	CKK_SHA512_224_HMAC = 0x27,
+	CKK_SHA512_256_HMAC = 0x28,
+	CKK_SHA512_T_HMAC = 0x29,
+	CKK_SHA_1_HMAC = 0x40,
+	CKK_SHA224_HMAC = 0x41,
+	CKK_SHA256_HMAC = 0x42,
+	CKK_SHA384_HMAC = 0x43,
+	CKK_SHA512_HMAC = 0x44,
+	CKK_SEED = 0x50,
+	CKK_GOSTR3410 = 0x60,
+	CKK_GOSTR3411 = 0x61,
+	CKK_GOST28147 = 0x62,
+}
+
+export enum EKeyConsumer {
+	C_CreateObject,
+	C_GenerateKey,
+	C_GenerateKeyPair,
+	C_WrapKey,
+	C_UnwrapKey,
 }

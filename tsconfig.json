@@ -25,7 +25,9 @@
 			"@/*": ["./src/*"]
 		},
 		//"inlineSourceMap": true,
-		"resolveJsonModule": true
+		"resolveJsonModule": true,
+		"strictBuiltinIteratorReturn": true,
+		"strictFunctionTypes": true
 	},
 	"include": ["src", "__tests__/t2est.ts", "__tests__"]
 }

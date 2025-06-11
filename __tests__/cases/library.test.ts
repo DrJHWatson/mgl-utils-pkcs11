@@ -1,5 +1,7 @@
 import {
 	EAttributeType,
+	EKeyConsumer,
+	EKeyType,
 	EObjectClass,
 	EPKCSMechanism,
 	ESessionState,
@@ -7,7 +9,7 @@ import {
 } from '@/LowLevel/LibEnums';
 import { ESessionInfoFlag } from '@/LowLevel/LibTypes';
 import { PKCS11Lib } from '@/LowLevel/PKCS11Lib';
-import { ulongToNumber } from '@/LowLevel/Utils';
+import { makeKeyTemplate, ulongToNumber } from '@/LowLevel/Utils';
 import path from 'path';
 import { alloc } from 'ref-napi';
 
@@ -105,6 +107,7 @@ describe('library mapping', () => {
 
 			return info;
 		});
+		//console.log(infos);
 		expect(infos.length).toBeGreaterThan(0);
 	});
 
@@ -440,6 +443,58 @@ describe('library mapping', () => {
 			expect(resultBuffer2.toString('hex')).toBe(
 				'098f6bcd4621d373cade4e832627b4f6',
 			);
+		} finally {
+			lib.C_CloseSession(session);
+		}
+	});
+
+	test('generate key', () => {
+		const { token, userPin } = findToken();
+		const session = lib.C_OpenSession(
+			token.slotId,
+			ESessionInfoFlag.CKF_SERIAL_SESSION +
+				ESessionInfoFlag.CKF_RW_SESSION,
+		);
+		try {
+			lib.C_Login(session, EUserType.CKU_USER, userPin);
+			const len = Buffer.alloc(4);
+			len.writeUInt32LE(512);
+			const keys = lib.C_GenerateKeyPair(
+				session,
+				{
+					type: EPKCSMechanism.CKM_RSA_PKCS_KEY_PAIR_GEN,
+					data: null,
+				},
+				makeKeyTemplate<EKeyConsumer.C_GenerateKeyPair>({
+					class: EObjectClass.CKO_PUBLIC_KEY,
+					keyType: EKeyType.CKK_RSA,
+					modulusBitsCount: 512,
+				}),
+				makeKeyTemplate<EKeyConsumer.C_GenerateKeyPair>({
+					class: EObjectClass.CKO_PRIVATE_KEY,
+					keyType: EKeyType.CKK_RSA,
+				}),
+			);
+			const plaintext = 'testtesttesttesttesttesttesttesttesttest';
+			lib.C_EncryptInit(
+				session,
+				{
+					type: EPKCSMechanism.CKM_RSA_PKCS,
+					data: null,
+				},
+				keys.publicKeyId,
+			);
+			const buf = lib.C_Encrypt(session, Buffer.from(plaintext));
+			lib.C_DecryptInit(
+				session,
+				{
+					data: null,
+					type: EPKCSMechanism.CKM_RSA_PKCS,
+				},
+				keys.privateKeyId,
+			);
+			const decr = lib.C_Decrypt(session, buf);
+			expect(plaintext).toBe(decr.toString());
 		} finally {
 			lib.C_CloseSession(session);
 		}
